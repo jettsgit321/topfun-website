@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TopFun.gg | Test Checkout</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: #141414;
+      --border: #2c2c2c;
+      --text: #f5f5f5;
+      --muted: #b8b8b8;
+      --brand: #9f1021;
+      --brand-soft: #c72b3c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at top, rgba(159, 16, 33, 0.25), transparent 50%), var(--bg);
+      color: var(--text);
+    }
+
+    .card {
+      width: min(620px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.2rem;
+    }
+
+    h1 { margin: 0; font-size: 1.8rem; }
+
+    .muted {
+      color: var(--muted);
+      margin: 0.65rem 0 1rem;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 0.6rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.95rem;
+    }
+
+    .label { color: var(--muted); }
+    .value { color: var(--text); word-break: break-all; }
+
+    .buttons {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    button,
+    a.btn {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.72rem 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:hover,
+    a.btn:hover {
+      background: var(--brand-soft);
+    }
+
+    #status {
+      margin-top: 0.9rem;
+      color: #9bf3b1;
+      font-weight: 600;
+      min-height: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Test Checkout Page</h1>
+    <p class="muted">This is a local test page to verify your purchase-link flow end to end.</p>
+
+    <div class="row"><span class="label">Token:</span><span class="value" id="token"></span></div>
+    <div class="row"><span class="label">User:</span><span class="value" id="user"></span></div>
+    <div class="row"><span class="label">Email:</span><span class="value" id="email"></span></div>
+    <div class="row"><span class="label">Plan:</span><span class="value" id="plan"></span></div>
+
+    <div class="buttons">
+      <button id="simulatePay" type="button">Simulate Payment Success</button>
+      <a class="btn" href="/" aria-label="Back to home">Back to site</a>
+    </div>
+
+    <p id="status"></p>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const fields = ["token", "user", "email", "plan"];
+
+    for (const key of fields) {
+      const value = params.get(key) || "(missing)";
+      const el = document.getElementById(key);
+      if (el) el.textContent = value;
+    }
+
+    const status = document.getElementById("status");
+    const simulatePay = document.getElementById("simulatePay");
+
+    simulatePay.addEventListener("click", () => {
+      status.textContent = "Payment marked as successful (test mode).";
+    });
+  </script>
+</body>
+</html>

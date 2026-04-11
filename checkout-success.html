@@ -1,0 +1,205 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TopFun.gg | Payment Successful</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #070707;
+      color: #f5f5f5;
+      padding: 1rem;
+    }
+
+    .card {
+      width: min(640px, 100%);
+      border: 1px solid #2d2d2d;
+      border-radius: 14px;
+      padding: 1.2rem;
+      background: #121212;
+    }
+
+    h1 {
+      margin: 0;
+    }
+
+    p {
+      color: #b8b8b8;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 0.55rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.95rem;
+    }
+
+    .label {
+      color: #9f9f9f;
+    }
+
+    .value {
+      color: #f5f5f5;
+      word-break: break-word;
+    }
+
+    .license {
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 0.9rem;
+    }
+
+    a.btn {
+      display: inline-block;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      background: #9f1021;
+      border-radius: 10px;
+      padding: 0.7rem 0.95rem;
+    }
+
+    a.btn.alt {
+      background: #1d1d1d;
+      border: 1px solid #323232;
+    }
+
+    #status {
+      min-height: 1.3rem;
+      color: #9bf3b1;
+      font-weight: 600;
+      margin: 0.65rem 0 0;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Payment Successful</h1>
+    <p>Finalizing delivery. This page checks your order and unlock link automatically.</p>
+
+    <div class="row"><span class="label">Session:</span><span class="value" id="sessionInfo">(missing)</span></div>
+    <div class="row"><span class="label">Order:</span><span class="value" id="orderInfo">pending...</span></div>
+    <div class="row"><span class="label">Plan:</span><span class="value" id="planInfo">pending...</span></div>
+    <div class="row"><span class="label">License:</span><span class="value license" id="licenseInfo">pending...</span></div>
+
+    <p id="status">Checking delivery status...</p>
+
+    <div class="buttons">
+      <a class="btn" id="deliveryBtn" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">Open Delivery</a>
+      <a class="btn alt" href="/">Back to topfun.gg</a>
+    </div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+
+    const sessionInfo = document.getElementById("sessionInfo");
+    const orderInfo = document.getElementById("orderInfo");
+    const planInfo = document.getElementById("planInfo");
+    const licenseInfo = document.getElementById("licenseInfo");
+    const statusEl = document.getElementById("status");
+    const deliveryBtn = document.getElementById("deliveryBtn");
+
+    sessionInfo.textContent = sessionId || "(missing)";
+
+    function applyOrder(order) {
+      orderInfo.textContent = order.orderId || "-";
+      planInfo.textContent = order.plan || "-";
+      const keys = Array.isArray(order.licenseKeys) && order.licenseKeys.length > 0
+        ? order.licenseKeys
+        : [order.licenseKey].filter(Boolean);
+      licenseInfo.textContent = keys.length > 0 ? keys.join(" | ") : "-";
+      statusEl.style.color = "#9bf3b1";
+      statusEl.textContent = "Delivery completed.";
+
+      if (order.deliveryUrl) {
+        deliveryBtn.href = order.deliveryUrl;
+        deliveryBtn.style.display = "inline-block";
+      }
+    }
+
+    async function fetchOrderStatus() {
+      const response = await fetch(`/api/order-status?session_id=${encodeURIComponent(sessionId)}`);
+      const data = await response.json();
+      if (data.ok && data.found && data.order) {
+        return data.order;
+      }
+      return null;
+    }
+
+    async function tryFinalize() {
+      const response = await fetch("/api/finalize-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.ok && data.order) {
+        return data.order;
+      }
+
+      return null;
+    }
+
+    async function checkOrderStatus() {
+      if (!sessionId) {
+        statusEl.style.color = "#ff8d99";
+        statusEl.textContent = "Missing session_id in URL. Stripe should redirect with session_id.";
+        return;
+      }
+
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        const order = await fetchOrderStatus();
+        if (order) {
+          applyOrder(order);
+          return;
+        }
+
+        statusEl.style.color = "#f0c26a";
+        statusEl.textContent = `Waiting for webhook fulfillment... (${attempt}/5)`;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      statusEl.style.color = "#f0c26a";
+      statusEl.textContent = "Webhook delayed. Running direct finalize check...";
+
+      const finalized = await tryFinalize();
+      if (finalized) {
+        applyOrder(finalized);
+        return;
+      }
+
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const order = await fetchOrderStatus();
+        if (order) {
+          applyOrder(order);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+
+      statusEl.style.color = "#ff8d99";
+      statusEl.textContent = "Payment succeeded but delivery is still pending. Contact support in Discord.";
+    }
+
+    checkOrderStatus().catch(() => {
+      statusEl.style.color = "#ff8d99";
+      statusEl.textContent = "Could not check order status.";
+    });
+  </script>
+</body>
+</html>
