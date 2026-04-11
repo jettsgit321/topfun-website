@@ -56,12 +56,12 @@ Webhook processing is now strict: if the secret is missing/invalid, `/api/stripe
 ## 5) Useful local test routes
 Simulate fulfillment:
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/dev/fulfill-session -ContentType 'application/json' -Body '{"username":"dev","email":"dev@example.com","plan":"Pro - $49/month"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/dev/fulfill-session -ContentType 'application/json' -Body '{"username":"dev","email":"dev@example.com","plan":"Pro - $25/month"}'
 ```
 
 Simulate subscription-linked fulfillment:
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/dev/fulfill-session -ContentType 'application/json' -Body '{"username":"dev","email":"dev@example.com","plan":"Pro - $49/month","stripeSubscriptionId":"sub_test_123"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/dev/fulfill-session -ContentType 'application/json' -Body '{"username":"dev","email":"dev@example.com","plan":"Pro - $25/month","stripeSubscriptionId":"sub_test_123"}'
 ```
 
 Simulate cancellation revoke:

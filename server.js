@@ -45,19 +45,19 @@ const MIME_TYPES = {
 };
 
 const PLAN_TO_ENV_KEY = {
-  "Starter - $19/week": "STRIPE_PRICE_STARTER",
-  "Pro - $49/month": "STRIPE_PRICE_PRO",
-  "Lifetime - $179 once": "STRIPE_PRICE_LIFETIME",
+  "Starter - $6/week": "STRIPE_PRICE_STARTER",
+  "Pro - $25/month": "STRIPE_PRICE_PRO",
+  "Lifetime - $85 once": "STRIPE_PRICE_LIFETIME",
 };
 
 const KEYAUTH_PLAN_CONFIG = {
-  "Starter - $19/week": {
+  "Starter - $6/week": {
     subEnv: "KEYAUTH_SUB_STARTER",
     daysEnv: "KEYAUTH_DAYS_STARTER",
     defaultSub: "starter",
     defaultDays: 7,
   },
-  "Pro - $49/month": {
+  "Pro - $25/month": {
     subEnv: "KEYAUTH_SUB_PRO",
     daysEnv: "KEYAUTH_DAYS_PRO",
     countEnv: "KEYAUTH_KEYS_PRO",
@@ -65,7 +65,7 @@ const KEYAUTH_PLAN_CONFIG = {
     defaultDays: 30,
     defaultCount: 3,
   },
-  "Lifetime - $179 once": {
+  "Lifetime - $85 once": {
     subEnv: "KEYAUTH_SUB_LIFETIME",
     daysEnv: "KEYAUTH_DAYS_LIFETIME",
     defaultSub: "lifetime",
@@ -549,9 +549,9 @@ function getKeyAuthPlanConfig(plan) {
     Number.isFinite(lifetimeCountRaw) && lifetimeCountRaw > 0 ? Math.floor(lifetimeCountRaw) : 2;
 
   let keyCount = 1;
-  if (plan === "Pro - $49/month") {
+  if (plan === "Pro - $25/month") {
     keyCount = proKeyCount;
-  } else if (plan === "Lifetime - $179 once") {
+  } else if (plan === "Lifetime - $85 once") {
     keyCount = lifetimeKeyCount;
   }
 
@@ -1536,7 +1536,7 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const username = String(body.username || "devuser");
       const email = String(body.email || "dev@example.com");
-      const plan = String(body.plan || "Pro - $49/month");
+      const plan = String(body.plan || "Pro - $25/month");
       const sessionId = String(body.sessionId || `cs_test_${randomToken(8)}`);
       const amountTotal = Number(body.amountTotal || 4900);
       const currency = String(body.currency || "usd");
