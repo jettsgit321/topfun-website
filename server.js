@@ -588,11 +588,25 @@ async function keyAuthSellerRequest(params) {
 
   const response = await fetch(`https://keyauth.win/api/seller/?${query.toString()}`, {
     method: "GET",
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "topfun.gg/1.0 (+https://www.topfun.gg)",
+    },
   });
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  let data = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    const preview = rawText ? rawText.slice(0, 220) : "empty response";
+    throw new Error(`KeyAuth HTTP ${response.status}: ${preview}`);
+  }
   if (!data || data.success === false) {
-    const message = data?.message || "KeyAuth seller API request failed.";
+    const message = data?.message || (rawText ? rawText.slice(0, 220) : "KeyAuth seller API request failed.");
     throw new Error(message);
   }
 
