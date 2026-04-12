@@ -846,6 +846,13 @@ async function createStripeCheckoutSession({ username, email, plan, origin }) {
 
   const payload = new URLSearchParams();
   payload.set("mode", checkoutMode);
+  const paymentMethodTypes = String(process.env.STRIPE_PAYMENT_METHOD_TYPES || "card")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  for (let index = 0; index < paymentMethodTypes.length; index += 1) {
+    payload.set(`payment_method_types[${index}]`, paymentMethodTypes[index]);
+  }
   payload.set("success_url", `${origin}/checkout-success.html?session_id={CHECKOUT_SESSION_ID}`);
   payload.set("cancel_url", `${origin}/checkout-cancel.html`);
   payload.set("line_items[0][price]", priceId);

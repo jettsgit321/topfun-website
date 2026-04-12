@@ -5,6 +5,7 @@
 2. Stripe setup:
    - Set `STRIPE_SECRET_KEY`
    - Set `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_LIFETIME` (must be `price_...`, not `prod_...`)
+   - Optional: set `STRIPE_PAYMENT_METHOD_TYPES=card` (or `card,link`)
    - Set `PUBLIC_BASE_URL` to your live/local URL (default local: `http://127.0.0.1:5700`)
 3. KeyAuth setup:
    - Set `KEYAUTH_SELLER_KEY`
