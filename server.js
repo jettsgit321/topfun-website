@@ -73,6 +73,18 @@ const KEYAUTH_PLAN_CONFIG = {
   },
 };
 
+const PLAN_SLOT_LIMIT_DEFAULTS = {
+  "Starter - $6/week": 1,
+  "Pro - $25/month": 3,
+  "Lifetime - $85 once": 2,
+};
+
+const PLAN_SLOT_LIMIT_ENV = {
+  "Starter - $6/week": "DEVICE_SLOTS_STARTER",
+  "Pro - $25/month": "DEVICE_SLOTS_PRO",
+  "Lifetime - $85 once": "DEVICE_SLOTS_LIFETIME",
+};
+
 function loadLocalEnv(filePath) {
   if (!fs.existsSync(filePath)) {
     return;
@@ -562,6 +574,16 @@ function getKeyAuthPlanConfig(plan) {
   };
 }
 
+function getPlanSlotLimit(plan) {
+  const defaultLimit = PLAN_SLOT_LIMIT_DEFAULTS[plan] || 1;
+  const envName = PLAN_SLOT_LIMIT_ENV[plan];
+  const raw = Number(envName ? process.env[envName] : defaultLimit);
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+  return defaultLimit;
+}
+
 function hasKeyAuthConfigForPlan(plan) {
   const sellerKey = String(process.env.KEYAUTH_SELLER_KEY || "").trim();
   const planConfig = getKeyAuthPlanConfig(plan);
@@ -975,6 +997,7 @@ async function fulfillCheckoutSession(session, publicBaseUrl) {
     currency,
     paymentStatus: String(session.payment_status || "paid"),
     status: "delivered",
+    slotLimit: getPlanSlotLimit(plan),
     licenseKey: issuedLicenseKey,
     licenseKeys: issuedLicenseKeys,
     licenseSource,
@@ -1095,10 +1118,7 @@ function upsertHwidBinding(order, hwid) {
     throw new Error("Missing HWID.");
   }
 
-  const keys = Array.isArray(order.licenseKeys) && order.licenseKeys.length > 0
-    ? order.licenseKeys
-    : [order.licenseKey].filter(Boolean);
-  const slotLimit = Math.max(1, keys.length);
+  const slotLimit = getOrderSlotLimit(order);
 
   if (!Array.isArray(order.hwidBindings)) {
     order.hwidBindings = [];
@@ -1150,6 +1170,16 @@ function getOrderLicenseKeys(order) {
 }
 
 function getOrderSlotLimit(order) {
+  const explicitSlotLimit = Number(order?.slotLimit);
+  if (Number.isFinite(explicitSlotLimit) && explicitSlotLimit > 0) {
+    return Math.floor(explicitSlotLimit);
+  }
+
+  const plan = String(order?.plan || "").trim();
+  if (plan) {
+    return getPlanSlotLimit(plan);
+  }
+
   return Math.max(1, getOrderLicenseKeys(order).length);
 }
 

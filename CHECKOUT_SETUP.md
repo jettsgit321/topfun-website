@@ -9,8 +9,9 @@
 3. KeyAuth setup:
    - Set `KEYAUTH_SELLER_KEY`
    - Set `KEYAUTH_SUB_STARTER`, `KEYAUTH_SUB_PRO`, `KEYAUTH_SUB_LIFETIME` to your KeyAuth subscription names
-   - Optional: set `KEYAUTH_KEYS_PRO=3` for Pro 3-device slots
-   - Optional: set `KEYAUTH_KEYS_LIFETIME=2` for Lifetime 2-device slots
+   - Optional: set `KEYAUTH_SELLER_URL=https://keyauth.win/api/seller/` to force one seller host
+   - Optional: set `KEYAUTH_KEYS_PRO=1` and `KEYAUTH_KEYS_LIFETIME=1` if KeyAuth bulk generation is blocked
+   - Set backend device-slot policy with `DEVICE_SLOTS_STARTER`, `DEVICE_SLOTS_PRO`, `DEVICE_SLOTS_LIFETIME` (for example `1/3/2`)
    - Optional: tune durations with `KEYAUTH_DAYS_*`
    - Optional: customize key mask with `KEYAUTH_MASK`
 4. Loader token setup:
