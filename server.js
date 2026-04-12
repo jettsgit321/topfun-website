@@ -636,6 +636,7 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TopFun.gg | Delivery</title>
+  <link rel="icon" type="image/png" href="/assets/favicon-topfun.png" />
   <style>
     body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #080808; color: #f5f5f5; }
     .wrap { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
