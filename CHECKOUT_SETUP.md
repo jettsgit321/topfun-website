@@ -22,6 +22,19 @@
 5. Customer portal setup:
    - Optional: set `STRIPE_PORTAL_RETURN_URL` (default fallback is `PUBLIC_BASE_URL/#pricing`)
    - Users can self-manage/cancel through `POST /api/create-portal-session` (site now includes this form)
+6. Email delivery setup (recommended):
+   - Set `EMAIL_PROVIDER=resend`
+   - Set `RESEND_API_KEY` from Resend dashboard
+   - Set `EMAIL_FROM` (must be a verified sender/domain in Resend)
+   - Optional: `EMAIL_RESEND_COOLDOWN_SECONDS` (default `30`)
+   - Recommended secure mode:
+     - `LOADER_DOWNLOAD_MODE=protected`
+     - `LOADER_FILE_PATH=downloads/topfun-loader.exe`
+     - `LOADER_FILE_NAME=topfun-loader.exe`
+     - Buyers will receive tokenized link: `/api/download-loader?token=...`
+   - Optional public mode:
+     - `LOADER_DOWNLOAD_MODE=public`
+     - Set `LOADER_DOWNLOAD_URL` to your direct file URL
 
 If KeyAuth seller key is not set, the server still fulfills with internal fallback keys.
 
@@ -48,6 +61,8 @@ Webhook processing is now strict: if the secret is missing/invalid, `/api/stripe
    - Uses KeyAuth seller API (`type=add`) if configured
    - Stores order + license in `data/orders.json`
    - Writes artifacts in `data/deliveries/` and `data/outbox/`
+   - Sends delivery email (key + loader link + delivery page link) when email env vars are configured
+   - In protected mode, direct static `/downloads/*` is blocked and access must use tokenized `/api/download-loader`
 4. Success page polls order status and now has fallback finalize by session id if webhook is delayed.
 5. If subscription is later canceled (`customer.subscription.deleted`), server revokes the KeyAuth key automatically (`type=del`) and marks order revoked.
 6. Non-payment/cancel coverage:
@@ -75,13 +90,19 @@ Check order status:
 ```powershell
 Invoke-RestMethod -Uri "http://127.0.0.1:5700/api/order-status?session_id=cs_test_xxx"
 ```
-`order-status` now returns `slotLimit` and `hwidBindings` in the `order` payload.
+`order-status` now returns `slotLimit`, `hwidBindings`, `emailDelivery`, `emailSentAt`, and `emailError` in the `order` payload.
+It also returns `loaderDownloadUrl`.
 
 Force finalize from Stripe session id:
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/finalize-session -ContentType 'application/json' -Body '{"session_id":"cs_test_xxx"}'
 ```
 `finalize-session` now also returns `slotLimit` and `hwidBindings`.
+
+Resend delivery email for a paid session:
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/resend-delivery-email -ContentType 'application/json' -Body '{"session_id":"cs_test_xxx"}'
+```
 
 Issue loader launch token (after successful order):
 ```powershell
@@ -102,7 +123,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5700/api/create-portal-sess
 - Disable `ENABLE_DEV_FULFILL` in production.
 - Use HTTPS and a public webhook endpoint.
 - Rotate leaked API keys immediately.
-- Add real email sender for outbox delivery.
+- Verify your `EMAIL_FROM` domain in Resend so provider-side delivery is not blocked.
 - Add auth on any admin/dev routes.
 - Keep `STRIPE_WEBHOOK_SECRET`, `LAUNCH_TOKEN_SECRET`, and `LOADER_CLIENT_SECRET` in server-only env.
 

@@ -93,10 +93,12 @@
     <div class="row"><span class="label">Order:</span><span class="value" id="orderInfo">pending...</span></div>
     <div class="row"><span class="label">Plan:</span><span class="value" id="planInfo">pending...</span></div>
     <div class="row"><span class="label">License:</span><span class="value license" id="licenseInfo">pending...</span></div>
+    <div class="row"><span class="label">Email:</span><span class="value" id="emailInfo">pending...</span></div>
 
     <p id="status">Checking delivery status...</p>
 
     <div class="buttons">
+      <a class="btn alt" id="resendBtn" href="#" style="display:none;">Resend Email</a>
       <a class="btn" id="deliveryBtn" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">Open Delivery</a>
       <a class="btn alt" href="/">Back to topfun.gg</a>
     </div>
@@ -110,10 +112,34 @@
     const orderInfo = document.getElementById("orderInfo");
     const planInfo = document.getElementById("planInfo");
     const licenseInfo = document.getElementById("licenseInfo");
+    const emailInfo = document.getElementById("emailInfo");
     const statusEl = document.getElementById("status");
+    const resendBtn = document.getElementById("resendBtn");
     const deliveryBtn = document.getElementById("deliveryBtn");
 
     sessionInfo.textContent = sessionId || "(missing)";
+
+    function setStatus(text, color) {
+      statusEl.style.color = color;
+      statusEl.textContent = text;
+    }
+
+    function formatEmailStatus(order) {
+      const state = String(order.emailDelivery || "").toLowerCase();
+      if (state === "sent") {
+        return `sent${order.emailSentAt ? ` (${order.emailSentAt})` : ""}`;
+      }
+      if (state === "failed") {
+        return `failed${order.emailError ? ` (${order.emailError})` : ""}`;
+      }
+      if (state === "disabled") {
+        return "disabled on server";
+      }
+      if (state === "pending") {
+        return "pending";
+      }
+      return state || "unknown";
+    }
 
     function applyOrder(order) {
       orderInfo.textContent = order.orderId || "-";
@@ -122,13 +148,34 @@
         ? order.licenseKeys
         : [order.licenseKey].filter(Boolean);
       licenseInfo.textContent = keys.length > 0 ? keys.join(" | ") : "-";
-      statusEl.style.color = "#9bf3b1";
-      statusEl.textContent = "Delivery completed.";
+      emailInfo.textContent = formatEmailStatus(order);
 
       if (order.deliveryUrl) {
         deliveryBtn.href = order.deliveryUrl;
         deliveryBtn.style.display = "inline-block";
       }
+
+      const emailState = String(order.emailDelivery || "").toLowerCase();
+      if (emailState === "sent") {
+        resendBtn.style.display = "none";
+        setStatus("Payment successful. Check your email for loader + key.", "#9bf3b1");
+        return;
+      }
+
+      if (emailState === "failed") {
+        resendBtn.style.display = "inline-block";
+        setStatus("Email delivery failed. You can resend now or open delivery page.", "#f0c26a");
+        return;
+      }
+
+      if (emailState === "disabled") {
+        resendBtn.style.display = "none";
+        setStatus("Email delivery is not configured yet. Use the delivery page for now.", "#f0c26a");
+        return;
+      }
+
+      resendBtn.style.display = "none";
+      setStatus("Payment successful. Finalizing your delivery details...", "#9bf3b1");
     }
 
     async function fetchOrderStatus() {
@@ -155,10 +202,41 @@
       return null;
     }
 
+    async function resendEmail() {
+      if (!sessionId) {
+        setStatus("Missing session_id in URL.", "#ff8d99");
+        return;
+      }
+
+      resendBtn.style.pointerEvents = "none";
+      resendBtn.style.opacity = "0.7";
+      setStatus("Resending delivery email...", "#f0c26a");
+
+      try {
+        const response = await fetch("/api/resend-delivery-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok || !data.order) {
+          const message = data && data.error ? data.error : "Could not resend email.";
+          setStatus(message, "#ff8d99");
+          return;
+        }
+
+        applyOrder(data.order);
+      } catch {
+        setStatus("Network error while resending email.", "#ff8d99");
+      } finally {
+        resendBtn.style.pointerEvents = "";
+        resendBtn.style.opacity = "";
+      }
+    }
+
     async function checkOrderStatus() {
       if (!sessionId) {
-        statusEl.style.color = "#ff8d99";
-        statusEl.textContent = "Missing session_id in URL. Stripe should redirect with session_id.";
+        setStatus("Missing session_id in URL. Stripe should redirect with session_id.", "#ff8d99");
         return;
       }
 
@@ -169,13 +247,11 @@
           return;
         }
 
-        statusEl.style.color = "#f0c26a";
-        statusEl.textContent = `Waiting for webhook fulfillment... (${attempt}/5)`;
+        setStatus(`Waiting for webhook fulfillment... (${attempt}/5)`, "#f0c26a");
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
-      statusEl.style.color = "#f0c26a";
-      statusEl.textContent = "Webhook delayed. Running direct finalize check...";
+      setStatus("Webhook delayed. Running direct finalize check...", "#f0c26a");
 
       const finalized = await tryFinalize();
       if (finalized) {
@@ -192,13 +268,16 @@
         await new Promise((resolve) => setTimeout(resolve, 1200));
       }
 
-      statusEl.style.color = "#ff8d99";
-      statusEl.textContent = "Payment succeeded but delivery is still pending. Contact support in Discord.";
+      setStatus("Payment succeeded but delivery is still pending. Contact support in Discord.", "#ff8d99");
     }
 
+    resendBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      resendEmail();
+    });
+
     checkOrderStatus().catch(() => {
-      statusEl.style.color = "#ff8d99";
-      statusEl.textContent = "Could not check order status.";
+      setStatus("Could not check order status.", "#ff8d99");
     });
   </script>
 </body>

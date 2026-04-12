@@ -22,6 +22,8 @@ const RATE_LIMIT_RULES = {
   portal: { windowMs: 5 * 60_000, max: 30, cooldownMs: 10 * 60_000 },
   finalize: { windowMs: 10 * 60_000, max: 20, cooldownMs: 15 * 60_000 },
   orderStatus: { windowMs: 2 * 60_000, max: 120, cooldownMs: 5 * 60_000 },
+  resendEmail: { windowMs: 2 * 60_000, max: 15, cooldownMs: 10 * 60_000 },
+  loaderDownload: { windowMs: 2 * 60_000, max: 80, cooldownMs: 10 * 60_000 },
   loaderToken: { windowMs: 2 * 60_000, max: 45, cooldownMs: 15 * 60_000 },
   loaderVerify: { windowMs: 2 * 60_000, max: 120, cooldownMs: 10 * 60_000 },
 };
@@ -42,6 +44,7 @@ const MIME_TYPES = {
   ".jpeg": "image/jpeg",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".exe": "application/vnd.microsoft.portable-executable",
 };
 
 const PLAN_TO_ENV_KEY = {
@@ -332,10 +335,228 @@ function createDeliveryUrl(token, publicBaseUrl) {
   return `${publicBaseUrl.replace(/\/$/, "")}/delivery/${token}`;
 }
 
+function getLoaderDownloadMode() {
+  const raw = String(process.env.LOADER_DOWNLOAD_MODE || "protected").trim().toLowerCase();
+  return raw === "public" ? "public" : "protected";
+}
+
+function isProtectedLoaderDownloadMode() {
+  return getLoaderDownloadMode() === "protected";
+}
+
+function getLoaderFilePath() {
+  const configured = String(process.env.LOADER_FILE_PATH || "").trim();
+  if (!configured) {
+    return path.join(ROOT, "downloads", "topfun-loader.exe");
+  }
+  return path.isAbsolute(configured) ? configured : path.resolve(ROOT, configured);
+}
+
+function getLoaderFileName() {
+  const configured = String(process.env.LOADER_FILE_NAME || "").trim();
+  if (configured) {
+    return configured.replaceAll(/[/\\]/g, "_");
+  }
+  const inferred = path.basename(getLoaderFilePath());
+  return inferred || "topfun-loader.exe";
+}
+
+function createProtectedLoaderDownloadUrl(deliveryToken, publicBaseUrl) {
+  return `${publicBaseUrl.replace(/\/$/, "")}/api/download-loader?token=${encodeURIComponent(deliveryToken)}`;
+}
+
+function getLoaderDownloadUrlForOrder(order, publicBaseUrl) {
+  const explicitUrl = String(process.env.LOADER_DOWNLOAD_URL || "").trim();
+  if (getLoaderDownloadMode() === "public") {
+    return explicitUrl || null;
+  }
+
+  if (order && String(order.deliveryToken || "").trim()) {
+    return createProtectedLoaderDownloadUrl(String(order.deliveryToken).trim(), publicBaseUrl);
+  }
+
+  return explicitUrl || null;
+}
+
+function isEmailDeliveryEnabled() {
+  const provider = String(process.env.EMAIL_PROVIDER || "resend").trim().toLowerCase();
+  if (provider !== "resend") {
+    return false;
+  }
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  const from = String(process.env.EMAIL_FROM || "").trim();
+  return Boolean(apiKey && from);
+}
+
+async function sendDeliveryEmail(order, publicBaseUrl) {
+  const provider = String(process.env.EMAIL_PROVIDER || "resend").trim().toLowerCase();
+  if (provider !== "resend") {
+    return {
+      sent: false,
+      provider,
+      reason: "Unsupported EMAIL_PROVIDER. Use resend.",
+    };
+  }
+
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  const from = String(process.env.EMAIL_FROM || "").trim();
+  if (!apiKey || !from) {
+    return {
+      sent: false,
+      provider: "resend",
+      reason: "Missing RESEND_API_KEY or EMAIL_FROM.",
+    };
+  }
+
+  const to = String(order.email || "").trim();
+  if (!to) {
+    return {
+      sent: false,
+      provider: "resend",
+      reason: "Order email is missing.",
+    };
+  }
+
+  const loaderUrl = getLoaderDownloadUrlForOrder(order, publicBaseUrl);
+  const deliveryUrl = createDeliveryUrl(order.deliveryToken, publicBaseUrl);
+  const allKeys = Array.isArray(order.licenseKeys) && order.licenseKeys.length > 0
+    ? order.licenseKeys
+    : [order.licenseKey].filter(Boolean);
+  const keysText = allKeys.map((key, index) => `License Key ${index + 1}: ${key}`).join("\n");
+  const keysHtml = allKeys
+    .map(
+      (key, index) =>
+        `<p style="margin:0 0 8px;"><strong>License Key ${index + 1}:</strong> <code style="font-size:14px;">${htmlEscape(
+          key
+        )}</code></p>`
+    )
+    .join("");
+
+  const text = [
+    "TopFun.gg delivery",
+    "",
+    `Order ID: ${order.orderId}`,
+    `Plan: ${order.plan}`,
+    `Username: ${order.username}`,
+    keysText,
+    loaderUrl ? `Loader Download: ${loaderUrl}` : "",
+    `Delivery Page: ${deliveryUrl}`,
+    `Support Discord: ${DISCORD_INVITE_URL}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const html = [
+    "<div style=\"font-family:Arial,sans-serif;color:#111;line-height:1.5;\">",
+    "<h2 style=\"margin:0 0 12px;\">TopFun.gg Delivery</h2>",
+    `<p style="margin:0 0 6px;"><strong>Order:</strong> ${htmlEscape(order.orderId)}</p>`,
+    `<p style="margin:0 0 6px;"><strong>Plan:</strong> ${htmlEscape(order.plan)}</p>`,
+    `<p style="margin:0 0 14px;"><strong>Username:</strong> ${htmlEscape(order.username)}</p>`,
+    keysHtml,
+    loaderUrl
+      ? `<p style="margin:12px 0 8px;"><a href="${htmlEscape(
+          loaderUrl
+        )}" target="_blank" rel="noopener noreferrer">Download Loader</a></p>`
+      : "",
+    `<p style="margin:8px 0;"><a href="${htmlEscape(
+      deliveryUrl
+    )}" target="_blank" rel="noopener noreferrer">Open Delivery Page</a></p>`,
+    `<p style="margin:8px 0;"><a href="${htmlEscape(
+      DISCORD_INVITE_URL
+    )}" target="_blank" rel="noopener noreferrer">Join Support Discord</a></p>`,
+    "</div>",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const payload = {
+    from,
+    to: [to],
+    subject: `TopFun.gg access delivered (${order.plan})`,
+    text,
+    html,
+  };
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await response.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message = data?.message || (raw ? raw.slice(0, 220) : "Email send failed.");
+    throw new Error(message);
+  }
+
+  return {
+    sent: true,
+    provider: "resend",
+    messageId: String(data?.id || "").trim() || null,
+  };
+}
+
+async function deliverOrderEmail(order, publicBaseUrl) {
+  const emailProvider = String(process.env.EMAIL_PROVIDER || "resend").trim().toLowerCase() || "resend";
+  order.emailProvider = emailProvider;
+  order.emailAttemptCount = Number.isFinite(Number(order.emailAttemptCount))
+    ? Math.max(0, Number(order.emailAttemptCount))
+    : 0;
+  order.emailAttemptCount += 1;
+  order.emailLastAttemptAt = new Date().toISOString();
+
+  if (!isEmailDeliveryEnabled()) {
+    order.emailDelivery = "disabled";
+    order.emailSentAt = null;
+    order.emailMessageId = null;
+    order.emailError = "Email delivery not configured.";
+    return {
+      sent: false,
+      provider: emailProvider,
+      reason: order.emailError,
+    };
+  }
+
+  try {
+    const result = await sendDeliveryEmail(order, publicBaseUrl);
+    order.emailProvider = String(result.provider || order.emailProvider || "resend");
+    if (result.sent) {
+      order.emailDelivery = "sent";
+      order.emailSentAt = new Date().toISOString();
+      order.emailMessageId = String(result.messageId || "").trim() || null;
+      order.emailError = null;
+      return result;
+    }
+
+    order.emailDelivery = "failed";
+    order.emailError = String(result.reason || "Email provider returned sent=false.");
+    return result;
+  } catch (error) {
+    order.emailDelivery = "failed";
+    order.emailError = error instanceof Error ? error.message : String(error || "Unknown email delivery error.");
+    return {
+      sent: false,
+      provider: order.emailProvider,
+      reason: order.emailError,
+    };
+  }
+}
+
 function writeDeliveryArtifacts(order, publicBaseUrl) {
   ensureDataStore();
 
   const deliveryUrl = createDeliveryUrl(order.deliveryToken, publicBaseUrl);
+  const loaderDownloadUrl = getLoaderDownloadUrlForOrder(order, publicBaseUrl);
   const allKeys = Array.isArray(order.licenseKeys) && order.licenseKeys.length > 0
     ? order.licenseKeys
     : [order.licenseKey].filter(Boolean);
@@ -370,6 +591,7 @@ function writeDeliveryArtifacts(order, publicBaseUrl) {
       plan: order.plan,
       licenseKey: order.licenseKey,
       licenseKeys: allKeys,
+      loaderDownloadUrl,
       deliveryUrl,
       supportDiscord: DISCORD_INVITE_URL,
     },
@@ -395,6 +617,7 @@ function htmlEscape(value) {
 
 function sendDeliveryPage(res, order, publicBaseUrl) {
   const deliveryUrl = createDeliveryUrl(order.deliveryToken, publicBaseUrl);
+  const loaderUrl = getLoaderDownloadUrlForOrder(order, publicBaseUrl);
   const allKeys = Array.isArray(order.licenseKeys) && order.licenseKeys.length > 0
     ? order.licenseKeys
     : [order.licenseKey].filter(Boolean);
@@ -440,6 +663,13 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
       ${keyRows}
       <div class="row"><span class="label">Delivery Link:</span><span class="value">${htmlEscape(deliveryUrl)}</span></div>
       <div class="btns">
+        ${
+  loaderUrl
+    ? `<a class="btn" href="${htmlEscape(
+      loaderUrl
+    )}" target="_blank" rel="noopener noreferrer">Download Loader</a>`
+    : ""
+}
         <a class="btn" href="${htmlEscape(DISCORD_INVITE_URL)}" target="_blank" rel="noopener noreferrer">Join Support Discord</a>
         <a class="btn alt" href="/">Back to site</a>
       </div>
@@ -949,7 +1179,10 @@ async function fulfillCheckoutSession(session, publicBaseUrl) {
   const orders = readOrders();
   const existing = orders.find((order) => order.sessionId === sessionId);
   if (existing) {
-    return existing;
+    return {
+      ...existing,
+      deliveryUrl: String(existing.deliveryUrl || "").trim() || createDeliveryUrl(existing.deliveryToken, publicBaseUrl),
+    };
   }
 
   const username =
@@ -1016,12 +1249,24 @@ async function fulfillCheckoutSession(session, publicBaseUrl) {
     deliveryToken,
     discordInvite: DISCORD_INVITE_URL,
     createdAt: new Date().toISOString(),
+    deliveryUrl: null,
+    emailProvider: String(process.env.EMAIL_PROVIDER || "resend").trim().toLowerCase() || "resend",
+    emailDelivery: "pending",
+    emailSentAt: null,
+    emailMessageId: null,
+    emailError: null,
+    emailAttemptCount: 0,
+    emailLastAttemptAt: null,
   };
 
   orders.push(order);
   writeOrders(orders);
 
   const deliveryUrl = writeDeliveryArtifacts(order, publicBaseUrl);
+  order.deliveryUrl = deliveryUrl;
+  await deliverOrderEmail(order, publicBaseUrl);
+
+  writeOrders(orders);
   return {
     ...order,
     deliveryUrl,
@@ -1208,6 +1453,16 @@ function buildOrderPayload(order, publicBaseUrl) {
     revokedAt: order.revokedAt || null,
     revokedReason: order.revokedReason || null,
     deliveryUrl: order.deliveryToken ? createDeliveryUrl(order.deliveryToken, publicBaseUrl) : null,
+    loaderDownloadUrl: getLoaderDownloadUrlForOrder(order, publicBaseUrl),
+    emailProvider: order.emailProvider || null,
+    emailDelivery: order.emailDelivery || null,
+    emailSentAt: order.emailSentAt || null,
+    emailMessageId: order.emailMessageId || null,
+    emailError: order.emailError || null,
+    emailAttemptCount: Number.isFinite(Number(order.emailAttemptCount))
+      ? Math.max(0, Number(order.emailAttemptCount))
+      : 0,
+    emailLastAttemptAt: order.emailLastAttemptAt || null,
     createdAt: order.createdAt,
   };
 }
@@ -1459,6 +1714,80 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (req.method === "POST" && url.pathname === "/api/resend-delivery-email") {
+    if (!enforceRateLimit(req, res, "resend-delivery-email", RATE_LIMIT_RULES.resendEmail)) {
+      return;
+    }
+
+    try {
+      const body = await parseBody(req);
+      const sessionId = String(body.session_id || body.sessionId || "").trim();
+      if (!sessionId) {
+        sendJson(res, 400, { ok: false, error: "Missing session_id" });
+        return;
+      }
+
+      const orders = readOrders();
+      const order = orders.find((entry) => entry.sessionId === sessionId);
+      if (!order) {
+        sendJson(res, 404, { ok: false, error: "Order not found for session_id." });
+        return;
+      }
+
+      if (order.keyAuthRevoked || String(order.status || "").toLowerCase() === "revoked") {
+        sendJson(res, 403, { ok: false, error: "License is revoked." });
+        return;
+      }
+
+      const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+      if (!(paymentStatus === "paid" || paymentStatus === "no_payment_required")) {
+        sendJson(res, 403, { ok: false, error: "Order payment is not valid." });
+        return;
+      }
+
+      const now = Date.now();
+      const resendCooldownSeconds = Math.max(
+        10,
+        Number(process.env.EMAIL_RESEND_COOLDOWN_SECONDS || 30)
+      );
+      const lastAttemptAt = Date.parse(String(order.emailLastAttemptAt || ""));
+      if (Number.isFinite(lastAttemptAt) && now - lastAttemptAt < resendCooldownSeconds * 1000) {
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil((resendCooldownSeconds * 1000 - (now - lastAttemptAt)) / 1000)
+        );
+        res.writeHead(429, {
+          "Content-Type": MIME_TYPES[".json"],
+          "Retry-After": String(retryAfterSeconds),
+        });
+        res.end(
+          JSON.stringify({
+            ok: false,
+            error: `Please wait ${retryAfterSeconds}s before resending email.`,
+          })
+        );
+        return;
+      }
+
+      const result = await deliverOrderEmail(order, buildPublicBaseUrl(req));
+      writeOrders(orders);
+
+      sendJson(res, result.sent ? 200 : 400, {
+        ok: Boolean(result.sent),
+        resent: Boolean(result.sent),
+        error: result.sent ? null : String(result.reason || order.emailError || "Email delivery failed."),
+        order: buildOrderPayload(order, buildPublicBaseUrl(req)),
+      });
+      return;
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        error: error.message || "Could not resend delivery email.",
+      });
+      return;
+    }
+  }
+
   if (req.method === "POST" && url.pathname === "/api/loader-token") {
     if (!enforceRateLimit(req, res, "loader-token", RATE_LIMIT_RULES.loaderToken)) {
       return;
@@ -1547,6 +1876,68 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+  }
+
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/download-loader") {
+    if (!enforceRateLimit(req, res, "download-loader", RATE_LIMIT_RULES.loaderDownload)) {
+      return;
+    }
+
+    const token = String(url.searchParams.get("token") || "").trim();
+    if (!token) {
+      sendJson(res, 400, { ok: false, error: "Missing download token." });
+      return;
+    }
+
+    const orders = readOrders();
+    const order = orders.find((entry) => entry.deliveryToken === token);
+    if (!order) {
+      sendJson(res, 404, { ok: false, error: "Delivery token not found." });
+      return;
+    }
+
+    if (order.keyAuthRevoked || String(order.status || "").toLowerCase() === "revoked") {
+      sendJson(res, 403, { ok: false, error: "License is revoked." });
+      return;
+    }
+
+    const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+    if (!(paymentStatus === "paid" || paymentStatus === "no_payment_required")) {
+      sendJson(res, 403, { ok: false, error: "Order payment is not valid." });
+      return;
+    }
+
+    const loaderPath = getLoaderFilePath();
+    if (!fs.existsSync(loaderPath)) {
+      sendJson(res, 503, { ok: false, error: "Loader file is not available yet." });
+      return;
+    }
+
+    const extension = path.extname(loaderPath).toLowerCase();
+    const mimeType = MIME_TYPES[extension] || "application/octet-stream";
+    const downloadName = getLoaderFileName().replaceAll(/["\r\n]/g, "");
+    res.writeHead(200, {
+      "Content-Type": mimeType,
+      "Content-Disposition": `attachment; filename="${downloadName}"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    });
+
+    if (req.method === "HEAD") {
+      res.end();
+      return;
+    }
+
+    const stream = fs.createReadStream(loaderPath);
+    stream.on("error", () => {
+      if (!res.headersSent) {
+        sendJson(res, 500, { ok: false, error: "Could not read loader file." });
+        return;
+      }
+      res.destroy();
+    });
+    stream.pipe(res);
+    return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/loader-verify") {
@@ -1730,6 +2121,13 @@ const server = http.createServer(async (req, res) => {
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Forbidden");
+    return;
+  }
+
+  const normalizedRequestPath = requestPath.replaceAll("\\", "/").toLowerCase();
+  if (isProtectedLoaderDownloadMode() && normalizedRequestPath.startsWith("/downloads/")) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Not found");
     return;
   }
 
