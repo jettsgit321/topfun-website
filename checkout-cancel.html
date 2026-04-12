@@ -37,6 +37,25 @@
       border-radius: 10px;
       padding: 0.7rem 0.95rem;
     }
+
+    .legal-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 0.85rem;
+      font-size: 0.9rem;
+    }
+
+    .legal-links a {
+      margin-top: 0;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: #cfcfcf;
+      font-weight: 600;
+    }
+
+    .legal-links a:hover { color: #fff; }
   </style>
 </head>
 <body>
@@ -44,6 +63,12 @@
     <h1>Checkout Canceled</h1>
     <p>No payment was completed. You can return to the site and try again anytime.</p>
     <a href="/">Back to topfun.gg</a>
+    <div class="legal-links">
+      <a href="/terms.html">Terms</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/refunds.html">Refunds</a>
+      <a href="/#checkout">Cancel Subscription</a>
+    </div>
   </main>
 </body>
 </html>

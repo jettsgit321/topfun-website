@@ -642,6 +642,15 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
     .card { width: min(680px, 100%); border: 1px solid #2c2c2c; border-radius: 14px; padding: 1.2rem; background: #121212; }
     h1 { margin: 0; }
     p { color: #b6b6b6; }
+    .notice {
+      margin: 0.9rem 0 1rem;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid #5e4a15;
+      background: #2d2410;
+      color: #ffd783;
+      border-radius: 10px;
+      font-size: 0.95rem;
+    }
     .row { display: grid; grid-template-columns: 140px 1fr; gap: 0.55rem; margin-bottom: 0.42rem; }
     .label { color: #9f9f9f; }
     .value { word-break: break-word; }
@@ -649,6 +658,9 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
     .btns { margin-top: 1rem; display: flex; gap: 0.6rem; flex-wrap: wrap; }
     a.btn { text-decoration: none; color: #fff; background: #9f1021; padding: 0.7rem 0.95rem; border-radius: 10px; font-weight: 700; }
     a.btn.alt { background: #1f1f1f; border: 1px solid #333; }
+    .legal-links { margin-top: 0.85rem; display: flex; gap: 0.7rem; flex-wrap: wrap; }
+    .legal-links a { color: #cfcfcf; text-decoration: none; font-size: 0.9rem; }
+    .legal-links a:hover { color: #fff; }
   </style>
 </head>
 <body>
@@ -656,6 +668,7 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
     <section class="card">
       <h1>Access Delivered</h1>
       <p>Your order is fulfilled. Use the license key below to activate your plan.</p>
+      <div class="notice">Email tip: check your Spam/Junk folder for your TopFun delivery email if you do not see it in inbox.</div>
       <div class="row"><span class="label">Order ID:</span><span class="value">${htmlEscape(order.orderId)}</span></div>
       <div class="row"><span class="label">Plan:</span><span class="value">${htmlEscape(order.plan)}</span></div>
       <div class="row"><span class="label">Username:</span><span class="value">${htmlEscape(order.username)}</span></div>
@@ -672,6 +685,12 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
 }
         <a class="btn" href="${htmlEscape(DISCORD_INVITE_URL)}" target="_blank" rel="noopener noreferrer">Join Support Discord</a>
         <a class="btn alt" href="/">Back to site</a>
+      </div>
+      <div class="legal-links">
+        <a href="/terms.html">Terms</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/refunds.html">Refunds</a>
+        <a href="/#checkout">Cancel Subscription</a>
       </div>
     </section>
   </main>

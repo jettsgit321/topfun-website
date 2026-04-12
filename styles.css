@@ -365,6 +365,40 @@ select:focus {
   font-size: 0.9rem;
 }
 
+.legal-note {
+  margin: 0;
+  border: 1px solid #3a3116;
+  background: #20190b;
+  color: #f5d18a;
+  border-radius: 10px;
+  padding: 0.7rem 0.75rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.legal-note a {
+  color: #fff;
+  font-weight: 700;
+}
+
+.consent-check {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  color: #d5d5d5;
+}
+
+.consent-check input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.consent-check a {
+  color: #fff;
+  font-weight: 700;
+}
+
 .portal-card {
   margin-top: 0.75rem;
   border: 1px solid var(--border);
@@ -393,6 +427,8 @@ select:focus {
 
 .footer-links {
   gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 @media (max-width: 1040px) {
