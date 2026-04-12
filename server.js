@@ -586,15 +586,10 @@ async function keyAuthSellerRequest(params) {
     query.set(key, String(value));
   }
 
-  const endpointCandidates = Array.from(
-    new Set(
-      [
-        String(process.env.KEYAUTH_SELLER_URL || "").trim(),
-        "https://keyauth.win/api/seller/",
-        "https://keyauth.cc/api/seller/",
-      ].filter(Boolean)
-    )
-  );
+  const customSellerUrl = String(process.env.KEYAUTH_SELLER_URL || "").trim();
+  const endpointCandidates = customSellerUrl
+    ? [customSellerUrl]
+    : ["https://keyauth.win/api/seller/", "https://keyauth.cc/api/seller/"];
   let lastError = null;
 
   for (const baseUrl of endpointCandidates) {
