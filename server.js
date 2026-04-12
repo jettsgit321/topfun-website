@@ -586,59 +586,71 @@ async function keyAuthSellerRequest(params) {
     query.set(key, String(value));
   }
 
-  const endpoint = `https://keyauth.win/api/seller/?${query.toString()}`;
+  const endpointCandidates = Array.from(
+    new Set(
+      [
+        String(process.env.KEYAUTH_SELLER_URL || "").trim(),
+        "https://keyauth.win/api/seller/",
+        "https://keyauth.cc/api/seller/",
+      ].filter(Boolean)
+    )
+  );
   let lastError = null;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15_000);
-      let response = null;
+  for (const baseUrl of endpointCandidates) {
+    const endpoint = `${baseUrl.replace(/\/+$/, "")}/?${query.toString()}`;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        response = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Accept-Encoding": "identity",
-            "User-Agent": "topfun.gg/1.0 (+https://www.topfun.gg)",
-            Connection: "close",
-          },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeout);
-      }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 45_000);
+        let response = null;
+        try {
+          response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Accept-Encoding": "identity",
+              "User-Agent": "topfun.gg/1.0 (+https://www.topfun.gg)",
+              Connection: "close",
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
 
-      const rawText = await response.text();
-      let data = null;
-      try {
-        data = rawText ? JSON.parse(rawText) : null;
-      } catch {
-        data = null;
-      }
+        const rawText = await response.text();
+        let data = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : null;
+        } catch {
+          data = null;
+        }
 
-      if (!response.ok) {
-        const preview = rawText ? rawText.slice(0, 220) : "empty response";
-        throw new Error(`KeyAuth HTTP ${response.status}: ${preview}`);
-      }
-      if (!data || data.success === false) {
-        const message = data?.message || (rawText ? rawText.slice(0, 220) : "KeyAuth seller API request failed.");
-        throw new Error(message);
-      }
+        if (!response.ok) {
+          const preview = rawText ? rawText.slice(0, 220) : "empty response";
+          throw new Error(`KeyAuth HTTP ${response.status}: ${preview}`);
+        }
+        if (!data || data.success === false) {
+          const message = data?.message || (rawText ? rawText.slice(0, 220) : "KeyAuth seller API request failed.");
+          throw new Error(message);
+        }
 
-      return data;
-    } catch (error) {
-      const message = String(error?.message || error || "unknown");
-      lastError = new Error(`KeyAuth attempt ${attempt}/3 failed: ${message}`);
-      const retryable =
-        message.includes("terminated")
-        || message.includes("fetch failed")
-        || message.includes("aborted")
-        || message.includes("socket");
-      if (!retryable || attempt === 3) {
-        break;
+        return data;
+      } catch (error) {
+        const message = String(error?.message || error || "unknown");
+        lastError = new Error(`KeyAuth ${baseUrl} attempt ${attempt}/3 failed: ${message}`);
+        const retryable =
+          message.includes("terminated")
+          || message.includes("fetch failed")
+          || message.includes("aborted")
+          || message.includes("socket")
+          || message.includes("timed out");
+        if (!retryable || attempt === 3) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
       }
-      await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
     }
   }
 
