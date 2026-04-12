@@ -39,6 +39,8 @@ const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -636,6 +638,7 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TopFun.gg | Delivery</title>
+  <meta name="robots" content="noindex,nofollow" />
   <link rel="icon" type="image/png" href="/assets/favicon-topfun.png" />
   <style>
     body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #080808; color: #f5f5f5; }
