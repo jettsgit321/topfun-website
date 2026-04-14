@@ -50,17 +50,44 @@ const MIME_TYPES = {
 };
 
 const PLAN_TO_ENV_KEY = {
+  "Starter - $6 (1 week access)": "STRIPE_PRICE_STARTER",
+  "Pro - $25 (1 month access)": "STRIPE_PRICE_PRO",
+  "Lifetime - $85 (lifetime access)": "STRIPE_PRICE_LIFETIME",
   "Starter - $6/week": "STRIPE_PRICE_STARTER",
   "Pro - $25/month": "STRIPE_PRICE_PRO",
   "Lifetime - $85 once": "STRIPE_PRICE_LIFETIME",
 };
 
 const KEYAUTH_PLAN_CONFIG = {
+  "Starter - $6 (1 week access)": {
+    subEnv: "KEYAUTH_SUB_STARTER",
+    daysEnv: "KEYAUTH_DAYS_STARTER",
+    defaultSub: "starter",
+    defaultDays: 7,
+    defaultCount: 1,
+  },
+  "Pro - $25 (1 month access)": {
+    subEnv: "KEYAUTH_SUB_PRO",
+    daysEnv: "KEYAUTH_DAYS_PRO",
+    countEnv: "KEYAUTH_KEYS_PRO",
+    defaultSub: "pro",
+    defaultDays: 30,
+    defaultCount: 3,
+  },
+  "Lifetime - $85 (lifetime access)": {
+    subEnv: "KEYAUTH_SUB_LIFETIME",
+    daysEnv: "KEYAUTH_DAYS_LIFETIME",
+    countEnv: "KEYAUTH_KEYS_LIFETIME",
+    defaultSub: "lifetime",
+    defaultDays: 36500,
+    defaultCount: 2,
+  },
   "Starter - $6/week": {
     subEnv: "KEYAUTH_SUB_STARTER",
     daysEnv: "KEYAUTH_DAYS_STARTER",
     defaultSub: "starter",
     defaultDays: 7,
+    defaultCount: 1,
   },
   "Pro - $25/month": {
     subEnv: "KEYAUTH_SUB_PRO",
@@ -73,18 +100,26 @@ const KEYAUTH_PLAN_CONFIG = {
   "Lifetime - $85 once": {
     subEnv: "KEYAUTH_SUB_LIFETIME",
     daysEnv: "KEYAUTH_DAYS_LIFETIME",
+    countEnv: "KEYAUTH_KEYS_LIFETIME",
     defaultSub: "lifetime",
     defaultDays: 36500,
+    defaultCount: 2,
   },
 };
 
 const PLAN_SLOT_LIMIT_DEFAULTS = {
+  "Starter - $6 (1 week access)": 1,
+  "Pro - $25 (1 month access)": 3,
+  "Lifetime - $85 (lifetime access)": 2,
   "Starter - $6/week": 1,
   "Pro - $25/month": 3,
   "Lifetime - $85 once": 2,
 };
 
 const PLAN_SLOT_LIMIT_ENV = {
+  "Starter - $6 (1 week access)": "DEVICE_SLOTS_STARTER",
+  "Pro - $25 (1 month access)": "DEVICE_SLOTS_PRO",
+  "Lifetime - $85 (lifetime access)": "DEVICE_SLOTS_LIFETIME",
   "Starter - $6/week": "DEVICE_SLOTS_STARTER",
   "Pro - $25/month": "DEVICE_SLOTS_PRO",
   "Lifetime - $85 once": "DEVICE_SLOTS_LIFETIME",
@@ -694,7 +729,7 @@ function sendDeliveryPage(res, order, publicBaseUrl) {
         <a href="/terms.html">Terms</a>
         <a href="/privacy.html">Privacy</a>
         <a href="/refunds.html">Refunds</a>
-        <a href="/#checkout">Cancel Subscription</a>
+        <a href="/#checkout">Checkout</a>
       </div>
     </section>
   </main>
@@ -806,19 +841,14 @@ function getKeyAuthPlanConfig(plan) {
   const subscriptionName = String(process.env[config.subEnv] || config.defaultSub).trim();
   const daysRaw = Number(process.env[config.daysEnv] || config.defaultDays);
   const durationDays = Number.isFinite(daysRaw) && daysRaw > 0 ? Math.floor(daysRaw) : config.defaultDays;
-  const proCountRaw = Number(process.env.KEYAUTH_KEYS_PRO || 3);
-  const lifetimeCountRaw = Number(process.env.KEYAUTH_KEYS_LIFETIME || 2);
-  const proKeyCount =
-    Number.isFinite(proCountRaw) && proCountRaw > 0 ? Math.floor(proCountRaw) : 3;
-  const lifetimeKeyCount =
-    Number.isFinite(lifetimeCountRaw) && lifetimeCountRaw > 0 ? Math.floor(lifetimeCountRaw) : 2;
-
-  let keyCount = 1;
-  if (plan === "Pro - $25/month") {
-    keyCount = proKeyCount;
-  } else if (plan === "Lifetime - $85 once") {
-    keyCount = lifetimeKeyCount;
-  }
+  const countEnvName = String(config.countEnv || "").trim();
+  const defaultCount = Number.isFinite(Number(config.defaultCount)) && Number(config.defaultCount) > 0
+    ? Math.floor(Number(config.defaultCount))
+    : 1;
+  const keyCountRaw = Number(countEnvName ? process.env[countEnvName] : defaultCount);
+  const keyCount = Number.isFinite(keyCountRaw) && keyCountRaw > 0
+    ? Math.floor(keyCountRaw)
+    : defaultCount;
 
   return {
     subscriptionName,
@@ -1095,7 +1125,12 @@ async function createStripeCheckoutSession({ username, email, plan, origin }) {
   }
 
   const priceResult = await stripeGetJson(`/v1/prices/${encodeURIComponent(priceId)}`, secretKey);
-  const checkoutMode = priceResult.recurring ? "subscription" : "payment";
+  if (priceResult?.recurring) {
+    throw new Error(
+      "Selected Stripe price is recurring. Use one-time price IDs only for Starter/Pro/Lifetime."
+    );
+  }
+  const checkoutMode = "payment";
 
   const payload = new URLSearchParams();
   payload.set("mode", checkoutMode);
@@ -2040,7 +2075,7 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const username = String(body.username || "devuser");
       const email = String(body.email || "dev@example.com");
-      const plan = String(body.plan || "Pro - $25/month");
+      const plan = String(body.plan || "Pro - $25 (1 month access)");
       const sessionId = String(body.sessionId || `cs_test_${randomToken(8)}`);
       const amountTotal = Number(body.amountTotal || 4900);
       const currency = String(body.currency || "usd");
