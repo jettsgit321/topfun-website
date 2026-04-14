@@ -108,6 +108,64 @@ body {
   padding-top: 2.8rem;
 }
 
+.giveaway-banner {
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  border: 1px solid rgba(199, 43, 60, 0.45);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(159, 16, 33, 0.26), rgba(159, 16, 33, 0.08) 52%, rgba(12, 12, 12, 0.9));
+  padding: 0.7rem 0.9rem;
+}
+
+.giveaway-text {
+  margin: 0;
+  color: #f2d8dc;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.giveaway-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 186, 197, 0.5);
+  border-radius: 999px;
+  background: rgba(199, 43, 60, 0.36);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.28rem 0.58rem;
+}
+
+.giveaway-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 800;
+  padding: 0.58rem 0.82rem;
+  background: rgba(255, 255, 255, 0.08);
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.giveaway-link:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
 .hero-grid {
   display: grid;
   grid-template-columns: 1fr minmax(320px, 500px);
@@ -443,6 +501,11 @@ select:focus {
 }
 
 @media (max-width: 860px) {
+  .giveaway-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .grid.three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
