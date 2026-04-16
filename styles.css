@@ -108,6 +108,65 @@ body {
   padding-top: 2.8rem;
 }
 
+.side-giveaway {
+  position: fixed;
+  right: 14px;
+  top: 34%;
+  z-index: 40;
+  width: min(220px, 28vw);
+  border: 1px solid rgba(199, 43, 60, 0.46);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(159, 16, 33, 0.2), rgba(13, 13, 13, 0.95));
+  backdrop-filter: blur(2px);
+  padding: 0.7rem;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+}
+
+.side-giveaway-kicker {
+  margin: 0;
+  display: inline-flex;
+  border: 1px solid rgba(255, 186, 197, 0.52);
+  border-radius: 999px;
+  background: rgba(199, 43, 60, 0.38);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.22rem 0.5rem;
+}
+
+.side-giveaway-copy {
+  margin: 0.5rem 0 0;
+  color: #f3dce0;
+  font-weight: 700;
+  line-height: 1.35;
+  font-size: 0.88rem;
+}
+
+.side-giveaway-link {
+  margin-top: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.08);
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.side-giveaway-link:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.36);
+}
+
 .giveaway-banner {
   margin-top: 0.35rem;
   display: flex;
@@ -501,6 +560,13 @@ select:focus {
 }
 
 @media (max-width: 860px) {
+  .side-giveaway {
+    position: static;
+    width: min(1080px, 92vw);
+    margin: 0.7rem auto 0;
+    box-shadow: none;
+  }
+
   .giveaway-banner {
     flex-direction: column;
     align-items: flex-start;
