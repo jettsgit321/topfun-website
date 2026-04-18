@@ -9,6 +9,8 @@ const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT || 5500);
 const ROOT = __dirname;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://${HOST}:${PORT}`;
+const CANONICAL_HOST = String(process.env.CANONICAL_HOST || "topfun.gg").trim().toLowerCase();
+const WWW_CANONICAL_HOST = `www.${CANONICAL_HOST}`;
 const DISCORD_INVITE_URL = process.env.DISCORD_INVITE_URL || "https://discord.gg/NmSn7dqPC8";
 const WEBHOOK_TOLERANCE_SECONDS = 300;
 const LAUNCH_TOKEN_TTL_SECONDS = Math.max(
@@ -807,7 +809,7 @@ function parseRawBody(req) {
 }
 
 function buildOrigin(req) {
-  const hostHeader = req.headers.host || `${HOST}:${PORT}`;
+  const hostHeader = getRequestHost(req) || `${HOST}:${PORT}`;
   return `http://${hostHeader}`;
 }
 
@@ -816,6 +818,39 @@ function buildPublicBaseUrl(req) {
     return process.env.PUBLIC_BASE_URL;
   }
   return buildOrigin(req);
+}
+
+function getRequestHost(req) {
+  const forwardedHost = String(req.headers["x-forwarded-host"] || "")
+    .split(",")[0]
+    .trim();
+  if (forwardedHost) {
+    return forwardedHost;
+  }
+  return String(req.headers.host || "").trim();
+}
+
+function getRequestHostname(req) {
+  return getRequestHost(req).split(":")[0].toLowerCase();
+}
+
+function maybeRedirectToCanonicalHost(req, res, url) {
+  if (!CANONICAL_HOST) {
+    return false;
+  }
+
+  // Only canonicalize the public web host and keep API/webhook methods untouched.
+  if ((req.method !== "GET" && req.method !== "HEAD") || getRequestHostname(req) !== WWW_CANONICAL_HOST) {
+    return false;
+  }
+
+  const location = `https://${CANONICAL_HOST}${url.pathname}${url.search}`;
+  res.writeHead(301, {
+    Location: location,
+    "Cache-Control": "public, max-age=3600",
+  });
+  res.end();
+  return true;
 }
 
 function hasStripeConfigForPlan(plan) {
@@ -1527,6 +1562,10 @@ function buildOrderPayload(order, publicBaseUrl) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, buildOrigin(req));
+
+  if (maybeRedirectToCanonicalHost(req, res, url)) {
+    return;
+  }
 
   if (req.method === "POST" && url.pathname === "/api/create-checkout") {
     if (!enforceRateLimit(req, res, "create-checkout", RATE_LIMIT_RULES.checkout)) {

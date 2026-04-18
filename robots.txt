@@ -6,4 +6,4 @@ Disallow: /checkout-success.html
 Disallow: /checkout-cancel.html
 Disallow: /checkout-test.html
 
-Sitemap: https://www.topfun.gg/sitemap.xml
+Sitemap: https://topfun.gg/sitemap.xml
